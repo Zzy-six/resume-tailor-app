@@ -1,0 +1,20 @@
+{
+  "name": "简历定制助手 Pro",
+  "short_name": "简历助手",
+  "description": "上传简历与招聘要求，自动识别岗位方向，生成突出技术栈的定制简历。支持本地文件、图片 OCR、无 Key 本地 AI。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b0f17",
+  "theme_color": "#0b0f17",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>简历定制助手 Pro</title>
+<meta name="description" content="上传简历与招聘要求，自动识别岗位方向并生成突出技术栈的定制简历。支持本地文件、图片 OCR、无 Key 本地 AI 重写。">
+<meta name="theme-color" content="#0b0f17">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<style>
+:root{--bg:#0b0f17;--panel:#131a29;--panel2:#0f1626;--line:#232e45;--txt:#e7edf7;--sub:#93a3c0;--acc:#4f8cff;--acc2:#39d98a;--warn:#ffb65c;--danger:#ff6b6b;--violet:#a78bfa;}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;min-height:100vh;padding-bottom:env(safe-area-inset-bottom)}
+.wrap{max-width:1080px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;gap:12px;padding:10px 0 14px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--acc),var(--violet));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;flex-shrink:0}
+header h1{font-size:18px;font-weight:700}
+header .sub{font-size:11px;color:var(--sub);margin-top:2px}
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;margin-left:6px;background:rgba(57,217,138,.15);color:var(--acc2);border:1px solid rgba(57,217,138,.3);vertical-align:2px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){.cols{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.step{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--violet));color:#fff;font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.drop{border:1.6px dashed var(--line);border-radius:12px;padding:24px 12px;text-align:center;cursor:pointer;color:var(--sub);font-size:13px;transition:.2s;background:var(--panel2)}
+.drop:hover,.drop.over{border-color:var(--acc);color:var(--txt);background:rgba(79,140,255,.06)}
+.drop b{color:var(--acc)}
+.file-chip{display:inline-flex;align-items:center;gap:8px;background:#1b2740;border:1px solid var(--line);padding:5px 12px;border-radius:20px;font-size:12px;margin-top:10px;color:var(--txt);max-width:100%}
+.file-chip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.file-chip .rm{color:var(--danger);cursor:pointer;font-weight:700;flex-shrink:0}
+textarea{width:100%;min-height:100px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:11px 12px;font-size:13px;line-height:1.6;resize:vertical;font-family:inherit;margin-top:10px}
+textarea:focus,.in:focus{outline:none;border-color:var(--acc)}
+.label{font-size:12px;color:var(--sub);margin:12px 0 6px;display:flex;justify-content:space-between;align-items:center}
+.in{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:9px 12px;font-size:13px;margin:6px 0;font-family:inherit}
+select.in{cursor:pointer}
+.mainBtn{width:100%;margin-top:14px;padding:14px;background:linear-gradient(135deg,var(--acc),var(--violet));border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;transition:.2s}
+.mainBtn:hover{filter:brightness(1.1)}
+.mainBtn:disabled{opacity:.5;cursor:not-allowed}
+.mainBtn.alt{background:linear-gradient(135deg,#1f7a4d,var(--acc2));margin-top:10px}
+.btns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.sbtn{padding:10px 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);cursor:pointer;font-size:13px;transition:.2s}
+.sbtn:hover{border-color:var(--acc);color:var(--acc)}
+.sbtn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.sbtn.green{background:rgba(57,217,138,.15);border-color:var(--acc2);color:var(--acc2)}
+.result{display:none}
+.result.show{display:block}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px;flex-wrap:wrap;overflow-x:auto}
+.tab{padding:9px 16px;border-radius:10px 10px 0 0;cursor:pointer;font-size:13px;color:var(--sub);border:1px solid transparent;border-bottom:none;white-space:nowrap}
+.tab.on{color:var(--txt);background:var(--panel2);border-color:var(--line)}
+.panel{display:none}
+.panel.on{display:block}
+.scorebox{display:flex;align-items:center;gap:22px;padding:16px;background:var(--panel2);border-radius:14px;margin-bottom:14px;flex-wrap:wrap}
+.gauge{position:relative;width:96px;height:96px;flex-shrink:0}
+.gauge .num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800}
+.tag{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12px;margin:3px 4px 3px 0}
+.tag.hit{background:rgba(57,217,138,.14);color:var(--acc2);border:1px solid rgba(57,217,138,.35)}
+.tag.miss{background:rgba(255,107,107,.12);color:var(--danger);border:1px solid rgba(255,107,107,.35)}
+.tag.jd{background:rgba(79,140,255,.14);color:var(--acc);border:1px solid rgba(79,140,255,.35)}
+.tag.extra{background:rgba(167,139,250,.1);color:var(--violet);border:1px solid rgba(167,139,250,.3)}
+.tag.dir{background:rgba(57,217,138,.12);color:var(--acc2);border:1px solid rgba(57,217,138,.25);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--sub);font-weight:500;white-space:nowrap}
+.sugg{margin:6px 0;padding:10px 14px;background:rgba(255,182,92,.07);border-left:3px solid var(--warn);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7}
+pre.out{white-space:pre-wrap;word-break:break-word;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:16px;font-size:13px;line-height:1.8;max-height:520px;overflow:auto;font-family:inherit}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.note{font-size:12px;color:var(--sub);line-height:1.7;margin-top:10px}
+.msginfo{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;background:#1b2740;border:1px solid var(--acc);color:var(--txt);padding:10px 18px;border-radius:12px;font-size:13px;z-index:99;box-shadow:0 8px 30px rgba(0,0,0,.4);max-width:88%;display:none}
+.msginfo.on{display:block}
+.dirbar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(79,140,255,.07);border:1px solid rgba(79,140,255,.25);border-radius:10px;margin-top:10px;flex-wrap:wrap}
+.dirbar .tt{font-size:13px;color:var(--acc);font-weight:600}
+.mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+@media(max-width:560px){.mode-grid{grid-template-columns:1fr}}
+.mode{padding:12px;border:1.4px solid var(--line);border-radius:12px;cursor:pointer;font-size:12px;color:var(--sub);transition:.2s;text-align:center;background:var(--panel2)}
+.mode b{display:block;font-size:13px;color:var(--txt);margin-bottom:4px}
+.mode.on{border-color:var(--acc);color:var(--acc);background:rgba(79,140,255,.08)}
+.hidden{display:none!important}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.minichip{font-size:11px;padding:4px 10px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);color:var(--sub);cursor:pointer}
+.minichip.on{color:var(--txt);border-color:var(--acc);background:rgba(79,140,255,.1)}
+footer{color:var(--sub);font-size:11px;padding:16px 0 8px;text-align:center;line-height:1.8}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#2a3a5a;border-radius:4px}
+@media(display-mode: standalone){body{padding-top:6px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="logo">简</div>
+  <div style="flex:1">
+    <h1>简历定制助手 <span class="badge">PWA</span></h1>
+    <div>上传简历 + 招聘要求，自动识别岗位与技术栈，一键生成定制简历 · 本地 AI 免 Key</div>
+  </div>
+</header>
+
+<div class="cols">
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div class="card">
+      <h2><span class="step">1</span>我的简历</h2>
+      <div class="drop" id="resumeDrop">拖拽 / 点击上传<br><b>或选择本地文件夹导入</b><br><span style="font-size:11px;color:var(--sub)">支持 PDF / Word(.docx) / TXT / MD / 图片</span></div>
+      <div id="resumeChip"></div>
+      <div class="label">或直接粘贴简历文本</div>
+      <textarea id="resumeText" placeholder="粘贴简历文字（技能、项目经历、教育背景等）&#10;已上传文件可留空"></textarea>
+      <div class="btns">
+        <button class="sbtn" id="openDirBtn">打开本地文件夹</button>
+        <button class="sbtn" id="pickImgBtn">从图片导入简历</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">2</span>招聘要求（自动识别岗位）</h2>
+      <div class="drop" id="jdDrop">上传招聘截图 / 图片，<b>自动 OCR 识别</b><br><span style="font-size:11px;color:var(--sub)">JPG / PNG / WebP</span></div>
+      <div id="jdChip"></div>
+      <div class="label">或粘贴招聘要求文字（推荐，更精准）</div>
+      <textarea id="jdText" placeholder="粘贴岗位 JD：职位描述、任职要求、技术栈关键词等"></textarea>
+      <div class="label">手动指定岗位方向（可选）</div>
+      <div class="chips" id="dirChips"></div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div class="card">
+      <h2><span class="step">3</span>生成方式与 AI</h2>
+      <div class="label">选择简历生成引擎</div>
+      <div class="mode-grid">
+        <div class="mode on" data-mode="rule"><b>规则引擎</b>离线即时 · 无需联网</div>
+        <div class="mode" data-mode="local"><b>本地 AI</b>免费 · 浏览器内运行</div>
+        <div class="mode" data-mode="cloud"><b>云端 AI</b>需自备 API Key</div>
+      </div>
+      <div id="localCfg" class="hidden" style="margin-top:10px">
+        <div class="label">本地模型（默认自动探测可用模型，可手动改）</div>
+        <input class="in" id="localModel" value="Qwen2.5-0.5B-Instruct-q4">
+        <div class="label">模型源镜像</div>
+        <select class="in" id="modelMirror">
+          <option value="hf">Hugging Face 官方</option>
+          <option value="mirror">hf-mirror 国内镜像</option>
+        </select>
+        <div class="note">首次使用需下载模型（约 0.3~1.5GB），之后离线可用。模型加载失败可切换镜像或更换模型名（需 ONNX 格式）。</div>
+      </div>
+      <div id="cloudCfg" class="hidden" style="margin-top:10px">
+        <div class="label">Base URL（OpenAI 兼容）</div>
+        <input class="in" id="aiBase" placeholder="https://api.deepseek.com/v1 或 https://api.openai.com/v1">
+        <div class="label">API Key</div>
+        <input class="in" id="aiKey" type="password" placeholder="sk-...">
+        <div class="label">模型名</div>
+        <input class="in" id="aiModel" placeholder="deepseek-chat / gpt-4o-mini">
+        <div class="note">Key 仅保存在本机浏览器，不会上传到任何服务器。</div>
+      </div>
+      <div class="label" style="margin-top:12px">自定义关注技能词（逗号分隔，追加识别）</div>
+      <input class="in" id="extraKw" placeholder="如：Ceph, OpenStack, LangChain, Triton">
+      <button class="mainBtn" id="runBtn">开始分析并生成定制简历</button>
+      <div class="note" id="msg"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h2><span class="step">3</span>结果</h2>
+      <div class="result" id="result">
+        <div class="tabs">
+          <div class="tab on" data-t="match">匹配分析</div>
+          <div class="tab" data-t="resume">定制简历</div>
+          <div class="tab" data-t="report">完整报告</div>
+        </div>
+        <div class="panel on" id="t-match"></div>
+        <div class="panel" id="t-resume">
+          <div id="resumeBody"></div>
+          <div class="btns">
+            <button class="sbtn primary" id="copyBtn">复制简历</button>
+            <button class="sbtn green" id="dlBtn">下载 .md</button>
+          </div>
+        </div>
+        <div class="panel" id="t-report"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>简历定制助手 Pro · 数据本地处理 · 规则引擎免 Key · 本地 AI 浏览器内运行 · 云端 AI 需自备 Key<br>可安装到桌面/主屏幕（浏览器菜单 → 安装应用）</footer>
+</div>
+<div class="msginfo" id="toast"></div>
+
+<script type="module">
+/* ============ 岗位方向特征库 ============ */
+const DIRECTIONS = {
+  '运维/DevOps':['运维','devops','sre','docker','kubernetes','k8s','nginx','jenkins','ansible','prometheus','grafana','zabbix','部署','监控','告警','linux','shell','cicd','自动化运维','容器','kafka','elstic','elastic','日志','发布','故障','linux系统','负载均衡','ci/cd'],
+  '后端开发':['后端','java','spring','springboot','微服务','接口','go','golang','高并发','mysql','redis','rabbitmq','mybatis','dubbo','服务端','restful','jvm','分布式'],
+  '前端开发':['前端','vue','react','h5','css','javascript','typescript','小程序','webpack','uniapp','echarts','页面','dom','浏览器兼容'],
+  'AI/算法':['大模型','llm','agent','智能体','机器学习','深度学习','pytorch','tensorflow','算法','nlp','cv','模型','训练','微调','prompt','rag','embedding','生成式','自然语言'],
+  '测试':['测试','qa','自动化测试','接口测试','selenium','pytest','jmeter','用例','质量保障','appium','性能测试','bug'],
+  '大数据':['hadoop','spark','flink','数仓','数据仓库','hive','kafka','数据管道','离线数仓','实时计算','hbase','doris','clickhouse'],
+  '云计算':['云计算','iaas','openstack','虚拟化','vmware','kvm','云平台','私有云','混合云','serverless','对象存储','云原生'],
+  '网络安全':['安全','渗透','等保','漏洞','防火墙','waf','安全运营','安全测试','基线','应急响应'],
+  '嵌入式/客户端':['c++','c语言','嵌入式','单片机','驱动','rtos','硬件','客户端','qt'],
+  '产品/运营':['产品经理','需求文档','原型','axure','用户增长','运营','数据分析师','竞品','prd','拉新']
+};
+const SKILL_LIB = {
+  '基础设施/系统':['Linux','CentOS','Ubuntu','Debian','Windows Server','Shell','Bash','PowerShell','TCP/IP','HTTP','HTTPS','DNS','Nginx','Apache','HAProxy','iptables','VPN','网络','负载均衡','高可用','LVS','Keepalived'],
+  '容器与编排':['Docker','Kubernetes','K8s','Compose','Rancher','Helm','Containerd','Podman','Istio','Service Mesh','镜像仓库','Harbor'],
+  'CI/CD 与自动化':['Jenkins','GitLab CI','GitHub Actions','Git','GitLab','Ansible','Terraform','ArgoCD','Nexus','流水线','CI/CD','灰度发布','持续集成','持续交付','自动化部署'],
+  '监控与日志':['Prometheus','Grafana','Zabbix','Nagios','ELK','Elasticsearch','Filebeat','Logstash','Kibana','Loki','SkyWalking','ALERTMANAGER','监控告警','日志分析','巡检','拨测'],
+  '数据库与中间件':['MySQL','Redis','MongoDB','PostgreSQL','Oracle','SQL','RabbitMQ','Kafka','RocketMQ','Nacos','ZooKeeper','消息队列','缓存','主从复制','读写分离','备份'],
+  '编程语言':['Python','Go','Golang','Java','C++','C','Node.js','JavaScript','TypeScript','HTML','CSS','Vue','React','Gin','Spring','Flask','FastAPI','Django','SQL'],
+  '云计算平台':['阿里云','腾讯云','华为云','AWS','Azure','对象存储','OSS','CDN','VPC','SLB','CVM','ECS','函数计算','Serverless'],
+  '云原生与虚拟化':['OpenStack','VMware','KVM','Xen','Proxmox','PVE','超融合','裸金属','OpenShift'],
+  '安全与合规':['防火墙','安全组','WAF','等保','堡垒机','渗透测试','漏洞扫描','基线核查','IAM','零信任'],
+  'AI / Agent':['Agent','智能体','MCP','大模型','LLM','GPT','Prompt','提示词','RAG','Function Calling','API 编排','工作流','LangChain','向量库','Embedding','多智能体','模型微调','知识库','AIGC','自动化智能'],
+  '流程与协作':['Jira','禅道','Confluence','ITIL','工单','值班','SLA','容量规划','成本优化','应急预案']
+};
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+let resumeFileText='', jdOcrText='', fileHandle=null, dirHandle=null, engine='rule', finalMd='';
+let analysis=null;
+
+/* ================= 岗位方向识别 ================= */
+function detectDirection(text){
+  const t=(text||'').toLowerCase();
+  const scores={};
+  for(const dir in DIRECTIONS){
+    scores[dir]=(DIRECTIONS[dir]||[]).filter(k=>t.includes(k.toLowerCase())).length;
+  }
+  const sorted=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const max=sorted[0]?.[1]||0;
+  if(max===0) return [];
+  return sorted.filter(x=>x[1]===max).map(x=>x[0]).slice(0,2);
+}
+function renderDirChips(){
+  const box=$('#dirChips'); box.innerHTML='';
+  Object.keys(DIRECTIONS).forEach(dir=>{
+    const c=document.createElement('span');
+    c.className='minichip'+(analysis&&analysis.directions.includes(dir)?' on':'');
+    c.textContent=dir;
+    c.onclick=()=>{ c.classList.toggle('on'); };
+    box.appendChild(c);
+  });
+}
+function selectedDirs(){
+  return $$('#dirChips .minichip.on').map(c=>c.textContent);
+}
+
+/* ================= 文件读取 ================= */
+function toast(m,ms=2600){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),ms); }
+async function readFileBuffer(f){
+  if(f.size>20*1024*1024) throw new Error('文件超过 20MB');
+}
+async function readResumeFile(f, name){
+  name=name||f.name;
+  const lower=(name||'').toLowerCase();
+  const ext=lower.split('.').pop();
+  if(['txt','md','log'].includes(ext)) return await f.text();
+  const mime=f.type||'';
+  if(ext==='pdf'||mime.includes('pdf')){
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    const buf=await f.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    let out='';
+    for(let i=1;i<=pdf.numPages;i++){ const pg=await pdf.getPage(i); const tc=await pg.getTextContent(); out+=tc.items.map(x=>x.str).join(' ')+'\n'; }
+    return out;
+  }
+  if(ext==='docx'||mime.includes('word')||mime.includes('officedocument')){
+    const buf=await f.arrayBuffer(); const r=await mammoth.extractRawText({arrayBuffer:buf}); return r.value;
+  }
+  if(ext==='doc') throw new Error('旧版 .doc 请另存为 .docx 后重试');
+  if(['png','jpg','jpeg','webp','bmp'].includes(ext)||mime.startsWith('image')){
+    return await ocrFile(f); 
+  }
+  if(ext==='odt'||ext==='rtf'){ throw new Error(ext+' 暂不支持，请转成 txt/pdf/docx'); }
+  throw new Error('不支持类型：'+ext);
+}
+async function ocrFile(file){
+  toast('OCR 识别中（首次加载识别包可能较慢）...',5000);
+  try{
+    const worker=await Tesseract.createWorker(['chi_sim','eng'],1,{logger:m=>{ if(m.status==='recognizing text'&&m.progress) $('#msg').textContent='OCR：'+Math.round(m.progress*100)+'%'; }});
+    const {data}=await worker.recognize(file);
+    await worker.terminate();
+    return data.text;
+  }catch(e){ throw new Error('OCR 失败：'+e.message); }
+}
+function bindDrop(el, onFile){
+  el.addEventListener('click',()=>{ const inp=document.createElement('input'); inp.type='file'; inp.style.display='none'; inp.onchange=()=>onFile(inp.files[0]); inp.click(); });
+  ['dragover','dragenter'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();el.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();el.classList.remove('over');}));
+  el.addEventListener('drop',e=>{ if(e.dataTransfer.files.length) onFile(e.dataTransfer.files[0]); });
+}
+
+/* ================= 目录导入（File System Access API） ================= */
+async function pickDirectory(){
+  if(!window.showDirectoryPicker){ toast('当前浏览器不支持目录访问，建议使用最新版 Edge/Chrome'); return; }
+  try{
+    dirHandle=await window.showDirectoryPicker({mode:'read'});
+    toast('已打开文件夹：'+dirHandle.name);
+  }catch(e){ if(e.name!=='AbortError') toast('打开文件夹失败：'+e.message); }
+}
+async function listDirFiles(filter){
+  if(!dirHandle) return [];
+  const out=[];
+  for await (const entry of dirHandle.values()){
+    if(entry.kind!=='file') continue;
+    if(filter && !filter.some(f=>entry.name.toLowerCase().endsWith(f))) continue;
+    out.push(entry);
+  }
+  return out;
+}
+async function readFromDir(entry, kind){
+  const f=await entry.getFile();
+  if(kind==='resume'){
+    try{
+      const txt=await readResumeFile(f, entry.name);
+      resumeFileText=txt; $('#resumeChip').innerHTML='<span class="file-chip"><span class="nm">已从文件夹导入：'+entry.name+'</span><span class="rm" data-clear="resume">×</span></span>';
+      $('#resumeText').value=''; toast('已导入简历：'+txt.length+' 字');
+    }catch(e){ toast(e.message); }
+  }else{
+    try{
+      jdOcrText=await ocrFile(f);
+      $('#jdChip').innerHTML='<span class="file-chip"><span class="nm">已识别图片：'+entry.name+'</span><span class="rm" data-clear="jd">×</span></span>';
+      $('#jdText').value=jdOcrText; toast('图片识别完成：'+jdOcrText.length+' 字');
+    }catch(e){ toast(e.message); }
+  }
+}
+
+/* ================= 技能提取 ================= */
+function extractSkills(text){
+  if(!text) return [];
+  const t=' '+text.toLowerCase()+' ';
+  const found={};
+  for(const cat in SKILL_LIB){
+    for(const kw of SKILL_LIB[cat]){
+      const k=kw.toLowerCase();
+      if(t.includes(k)) found[k]=true;
+    }
+  }
+  const custom=$('#extraKw').value.split(/[,，;；]/).map(s=>s.trim()).filter(Boolean);
+  for(const c of custom){ if(c&&t.includes(c.toLowerCase())) found[c.toLowerCase()]=true; }
+  return Object.keys(found);
+}
+
+/* ================= 主流程 ================= */
+async function run(){
+  const resume=($('#resumeText').value.trim()||resumeFileText).trim();
+  const jd=($('#jdText').value.trim()||jdOcrText).trim();
+  if(!resume){ toast('请先上传或粘贴简历'); return; }
+  if(!jd){ toast('请上传岗位图片或粘贴招聘要求'); return; }
+  $('#msg').innerHTML='<span class="spin"></span>分析中...';
+
+  const directions=detectDirection(jd);
+  const manual=selectedDirs();
+  const finalDirs=[...new Set([...manual, ...directions])];
+  const jdSkills=extractSkills(jd);
+  const resumeSkills=extractSkills(resume);
+  const matched=jdSkills.filter(s=>resumeSkills.includes(s));
+  const missing=jdSkills.filter(s=>!resumeSkills.includes(s));
+  const extra=resumeSkills.filter(s=>!jdSkills.includes(s));
+  const score=jdSkills.length? Math.round(matched.length/jdSkills.length*100):0;
+
+  analysis={resume,jd,jdSkills,resumeSkills,matched,missing,extra,score,directions:finalDirs};
+  renderMatch(analysis);
+  renderResume(analysis);
+  renderReport(analysis);
+  $('#result').classList.add('show');
+  $('#msg').innerHTML='分析完成：识别岗位方向「'+finalDirs.join('/')+'」，匹配 '+matched.length+'/'+jdSkills.length+' 项。';
+  document.getElementById('result').scrollIntoView({behavior:'smooth'});
+}
+
+function renderMatch(d){
+  const col=d.score>=80?'#39d98a':d.score>=50?'#ffb65c':'#ff6b6b';
+  let html=`<div class="scorebox">`;
+  html+=`<div class="gauge"><svg viewBox="0 0 96 96"><circle cx="48" cy="48" r="40" stroke="#232e45" stroke-width="9" fill="none"/><circle cx="48" cy="48" r="40" stroke="${col}" stroke-width="9" fill="none" stroke-dasharray="${d.score*2.51} 251" stroke-dashoffset="0" stroke-linecap="round"/></svg><div class="num" style="color:${col}">${d.score}%</div></div>`;
+  html+=`<div style="flex:1;min-width:200px"><div style="font-weight:700">技术栈匹配度${d.score>=85?' · 优秀':d.score>=50?' · 可优化':' · 需补齐'}</div>
+  <div style="font-size:12px;color:var(--sub);margin-top:4px">JD 技术 ${d.jdSkills.length} 项 · 命中 ${d.matched.length} · 缺失 ${d.missing.length}</div>
+  <div style="margin-top:8px">识别岗位方向：${d.directions.map(x=>'<span class="tag dir">'+x+'</span>').join('')||'<span style="font-size:12px;color:var(--sub)">未识别（可手动点选方向）</span>'}</div></div></div>`;
+  html+=`<div class="label">JD 要求的技术栈</div><div>`+(d.jdSkills.length?d.jdSkills.map(s=>'<span class="tag jd">'+s+'</span>').join(''):'<span style="color:var(--sub)">词库内未命中（可追加自定义技能）</span>')+'</div>';
+  html+=`<div class="label">命中</div><div>`+(d.matched.length?d.matched.map(s=>'<span class="tag hit">'+s+'</span>').join(''):'<span style="font-size:12px;color:var(--sub)">暂无</span>')+'</div>';
+  html+=`<div class="label">缺失</div><div>`+(d.missing.length?d.missing.map(s=>'<span class="tag miss">'+s+'</span>').join(''):'<span style="font-size:12px;color:var(--sub)">全命中</span>')+'</div>';
+  html+=`<div class="label">额外技能</div><div>`+d.extra.slice(0,40).map(s=>'<span class="tag extra">'+s+'</span>').join('')+'</div>';
+  if(d.missing.length){
+    html+=`<div class="label">优化建议</div>`;
+    d.missing.slice(0,10).forEach(s=>{
+      html+=`<div class="sugg">缺失「<b>${s}</b>」：写项目时把该技术作为明确选型/实操写出来（“负责/使用/部署了 ${s}”），不要只写“了解”。已有动手经验的直接写进技能栏；完全没接触的建议先花 1-2 天上手实操再写“熟悉基础操作”，切忌假写成“精通”。</div>`;
+    });
+  }
+  $('#t-match').innerHTML=html;
+}
+
+function renderResume(a){
+  const order=[...new Set([...a.matched, ...a.resumeSkills])];
+  const top=order.filter(s=>a.jdSkills.includes(s));
+  const rest=order.filter(s=>!a.jdSkills.includes(s));
+  const dirName=a.directions[0]||'目标岗位';
+  let md=`# 定制版简历（${dirName}方向 · 依据 JD 突出技术栈）\n\n`;
+  md+=`> 生成说明：下方模板已将 JD 命中的技术栈置顶排序、项目描述按“JD 关键词+量化结果”改写。请替换“____”为你真实信息。\n\n`;
+  md+=`## 一、基本信息\n- 姓名：____ ｜ 求职意向：**${dirName}** ｜ 电话/邮箱/城市：____ ｜ 到岗时间/实习时长：____\n\n`;
+  md+=`## 二、核心优势（突出 ${top.slice(0,4).join('、')||'目标技术栈'}）\n\n`;
+  md+=`熟悉 **${top.slice(0,6).join('、')||'相关主流技术'}** 等核心技术栈，具备从需求分析、方案设计、部署上线到监控运维的完整落地能力；在实习/项目中独立/协作完成了 ${top.slice(0,5).join('、')||'相关技术'} 的应用与优化，注重自动化、稳定性与可观测性，能快速对齐团队技术体系并产出可量化结果。\n\n`;
+  md+=`## 三、技能清单（按 JD 匹配度排序）\n\n`;
+  md+=`**核心技能**\n`;
+  top.forEach((s,i)=>{ md+=(i<3?'- ⭐⭐ ':'- ⭐ ')+s+'\n'; });
+  if(rest.length) md+=`\n**其他技能**\n`+rest.map(s=>'- '+s).join('\n');
+  if(d.missing.length){
+    md+=`\n\n> ⚠️ JD 要求但简历未体现：${d.missing.join('、')}。请按“实操经验→上手了解→近期学习”顺序补进技能栏（勿编造“精通”）。\n`;
+  }
+  md+=`\n## 四、项目 / 实习经历（按 JD 关键词改写）\n\n`;
+  md+=`**项目一：____（建议用 JD 技术词命名）**\n- 技术栈：${top.slice(0,5).join('、')||'____'}\n- 描述：基于 ${top[0]||'____'} 搭建/实现____，负责____的部署配置与优化${d.missing.length?'，并引入 '+d.missing.slice(0,3).join('、')+' 作为补充实践':''}。\n- 结果：____ 指标提升 __%（替换真实数据），支撑 __ 并发/__ 台服务器/__ 用户。\n\n`;
+  md+=`**项目二：____**\n- 技术栈：____\n- 描述：____\n- 结果：____（量化，如人力/成本/时间节约）\n\n`;
+  md+=`## 五、教育 / 证书 / 其他\n- 学校专业：____ ｜ 毕业时间：____\n- 证书：____（岗位相关优先）\n`;
+  finalMd=md;
+  $('#resumeBody').innerHTML='<pre class="out" id="finalMd">'+md.replace(/</g,'&lt;')+'</pre>';
+}
+
+function renderReport(d){
+  let html=`<h3 style="font-size:15px;margin-bottom:12px">分析与定制总览</h3>`;
+  html+=`<table><tr><th>项目</th><th>内容</th></tr>`;
+  html+=`<tr><td>识别岗位方向</td><td>${d.directions.join('、')||'未识别'}</td></tr>`;
+  html+=`<tr><td>简历字数</td><td>${d.resume.length} 字</td></tr><tr><td>JD 字数</td><td>${d.jd.length} 字</td></tr>`;
+  html+=`<tr><td>JD 技术栈</td><td>${d.jdSkills.join('、')||'未识别'}</td></tr>`;
+  html+=`<tr><td>匹配度</td><td>${d.score}%（命中 ${d.matched.length}/${d.jdSkills.length}）</td></tr>`;
+  html+=`<tr><td>缺失技能</td><td style="color:var(--danger)">${d.missing.join('、')||'无'}</td></tr></table>`;
+  html+=`<div class="label">定制策略</div>`;
+  html+=`<div class="sugg">① 技能重排：JD 命中技术置顶加 ⭐，利于 HR/ATS 关键词筛选。</div>`;
+  html+=`<div class="sugg">② 项目改写：【JD 技术词 + 做了什么 + 量化结果】三要素句式。</div>`;
+  html+=`<div class="sugg">③ 缺失补齐：按实操＞了解＞近期学习的顺序补，不编造精通。</div>`;
+  html+=`<div class="sugg">④ 高频词嵌入：“稳定性”“自动化”“可观测性”等 JD 高频词放入自我评价。</div>`;
+  html+=`<div class="label">AI 重写简历</div>`;
+  html+=`<button class="sbtn primary" id="aiGenBtn" style="margin-top:6px">${engine==='rule'?'用规则引擎结果即当前模板':engine==='local'?'用本地 AI 重写（免费）':'用云端 AI 重写'}</button><span id="aiMsg" style="margin-left:10px;font-size:12px;color:var(--sub)"></span>`;
+  $('#tab-report').innerHTML=html;
+  const b=$('#aiGenBtn');
+  if(b) b.onclick=()=>{
+    if(engine==='local') localAIRewrite(d);
+    else if(engine==='cloud') cloudAIRewrite(d);
+    else toast('当前为规则引擎模式，直接使用右侧模板即可');
+  };
+}
+
+/* ================= 本地 AI（Transformers.js 免 Key） ================= */
+let localPipe=null;
+function askList(entries, title){
+  return new Promise(resolve=>{
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px';
+    const box=document.createElement('div');
+    box.style.cssText='background:#131a29;border:1px solid #232e45;border-radius:14px;padding:18px;width:100%;max-width:420px;max-height:70vh;display:flex;flex-direction:column';
+    box.innerHTML='<div style="font-weight:700;margin-bottom:10px">'+title+'</div><div style="overflow:auto;flex:1" id="askList"></div>';
+    const list=box.querySelector('#askList');
+    entries.forEach((e,i)=>{
+      const it=document.createElement('div');
+      it.style.cssText='padding:10px 12px;border:1px solid #232e45;border-radius:8px;margin-bottom:8px;cursor:pointer;font-size:13px';
+      it.textContent=e.name||('文件 '+i);
+      it.onmouseenter=()=>it.style.borderColor='#4f8cff';
+      it.onmouseleave=()=>it.style.borderColor='#232e45';
+      it.onclick=()=>{ document.body.removeChild(ov); resolve(e); };
+      list.appendChild(it);
+    });
+    const cancel=document.createElement('button');
+    cancel.textContent='取消';
+    cancel.style.cssText='margin-top:10px;padding:8px 0;background:#0f1626;border:1px solid #232e45;border-radius:8px;color:#93a3c0;cursor:pointer';
+    cancel.onclick=()=>{ document.body.removeChild(ov); resolve(null); };
+    box.appendChild(cancel);
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+  });
+}
+async function ensureLocalModel(){
+  const modelName=$('#localModel').value.trim();
+  const mirror=$('#modelMirror').value==='mirror';
+  const hfBase=mirror?'https://hf-mirror.com':'https://huggingface.co';
+  const candidates=[modelName,'onnx-community/Qwen2.5-0.5B-Instruct-q4','onnx-community/Qwen2.5-1.5B-Instruct-q4','Xenova/qwen2.5-0.5b-instruct'];
+  let ok=[];
+  for(const c of candidates){
+    try{
+      const r=await fetch(hfBase+'/'+c+'/resolve/main/config.json',{method:'HEAD'});
+      if(r.ok){ ok.push(c); break; }
+    }catch(e){}
+  }
+  const useModel=ok[0]||candidates[0];
+  let mod;
+  try{
+    mod=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.1');
+  }catch(e){ throw new Error('Transformers.js 加载失败：'+e.message); }
+  const {pipeline, env}=mod;
+  env.allowLocalModels=false;
+  env.useBrowserCache=true;
+  env.backends.onnx.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.1/dist/';
+  toast('正在加载本地模型（首次需下载，较大，请耐心等待）...',15000);
+  try{
+    localPipe=await pipeline('text-generation', useModel, {device:'wasm'});
+  }catch(e){ throw new Error('模型加载失败（'+useModel+'）：'+e.message+'。可切换镜像/模型名后重试'); }
+  return {ok:true, model:useModel};
+}
+async function localAIRewrite(d){
+  try{
+    await ensureLocalModel();
+    const prompt=`你是资深简历优化师。根据【岗位JD】和【我的简历】重写简历：
+1. 输出完整 Markdown 简历，个人信息用占位符，不虚构经历；
+2. 技能按 JD 技术栈优先排序，命中项加⭐；
+3. 项目经历按【JD技术词+做了什么+量化结果】改写，只使用简历中真实经历；
+4. JD 要求但我缺少的技能写在文末"待补充"，不写进技能区；
+5. 末尾加"匹配度说明"。
+只输出简历正文。
+
+【岗位JD】
+${d.jd}
+
+【我的简历】
+${d.resume}`;
+    $('#aiMsg').innerHTML='<span class="spin"></span>本地模型生成中（浏览器内运行，可能需要数分钟）...';
+    const out=await localPipe(prompt,{max_new_tokens:1400, temperature:0.7, do_sample:true});
+    let text=Array.isArray(out)?out[0].generated_text:out.generated_text;
+    text=text.replace(prompt,'').trim();
+    finalMd=text||finalMd;
+    $('#resumeBody').innerHTML='<pre class="out">'+finalMd.replace(/</g,'&lt;')+'</pre>';
+    $('#aiMsg').textContent='本地 AI 生成完成（离线运行，未联网）→ 已更新到「定制简历」。';
+  }catch(e){
+    $('#aiMsg').textContent='本地 AI 失败：'+e.message+' 可切换镜像/模型，或改用规则引擎/云端 AI。';
+  }
+}
+/* ================= 云端 AI ================= */
+async function cloudAIRewrite(d){
+  const base=($('#aiBase').value.trim()||'').replace(/\/+$/,'');
+  const key=$('#aiKey').value.trim();
+  const model=$('#aiModel').value.trim();
+  if(!base||!key||!model){ toast('请填全 Base URL / API Key / 模型名'); return; }
+  $('#aiMsg').innerHTML='<span class="spin"></span>云端 AI 生成中...';
+  const url=base.includes('/chat/completions')?base:base+'/chat/completions';
+  const prompt=`你是资深简历优化师。请根据【目标岗位JD】与【我的简历】重写简历：
+1. 输出完整可投递的 Markdown 简历（个人信息用占位符），不虚构经历；
+2. 技能清单按 JD 优先级排序，命中项加⭐；
+3. 项目/实习经历按【首句点名JD技术栈+做了什么+量化结果】改写，仅用真实经历；JD 要求但简历没有的技能写在文末"待补充建议"，不要写入技能区；
+4. 末尾加"匹配度说明"和"投递前检查清单"。
+只输出简历正文。
+
+【岗位JD】
+${d.jd}
+
+【我的简历】
+${d.resume}`;
+  try{
+    const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'user',content:prompt}],temperature:0.7})});
+    if(!resp.ok){ const tt=await resp.text().catch(()=>''); throw new Error('HTTP '+resp.status+(tt?': '+tt.slice(0,150):'')); }
+    const j=await resp.json();
+    const content=j.choices?.[0]?.message?.content||'';
+    if(!content) throw new Error('返回内容为空');
+    finalMd=content;
+    $('#resumeBody').innerHTML='<pre class="out">'+finalMd.replace(/</g,'&lt;')+'</pre>';
+    $('#aiMsg').textContent='云端 AI 生成完成 → 已切到「定制简历」。';
+  }catch(e){ $('#aiMsg').textContent='云端 AI 失败：'+e.message; }
+}
+
+/* ================= 初始化 ================= */
+document.addEventListener('DOMContentLoaded',()=>{
+  renderDirChips();
+  bindDrop($('#resumeDrop'), async f=>{
+    try{
+      const name=f.name||'';
+      resumeFileText=await readResumeFile(f,name);
+      $('#resumeChip').innerHTML='<span class="file-chip"><span class="nm">'+name+'</span><span class="rm" data-clear="resume">×</span></span>';
+      $('#resumeText').value=''; toast('简历已载入：'+resumeFileText.length+' 字');
+    }catch(e){ toast(e.message); }
+  });
+  bindDrop($('#jdDrop'), async f=>{
+    try{
+      const name=f.name||'';
+      jdOcrText=await ocrFile(f);
+      $('#jdChip').innerHTML='<span class="file-chip"><span class="nm">'+name+'</span><span class="rm" data-clear="jd">×</span></span>';
+      $('#jdText').value=jdOcrText;
+      toast('图片识别完成：'+jdOcrText.length+' 字，请核对修正');
+    }catch(e){ toast(e.message); }
+  });
+
+  $('#openDirBtn').addEventListener('click',pickDirectory);
+  $('#pickImgBtn').addEventListener('click',async()=>{
+    const files=await listDirFiles(['.png','.jpg','.jpeg','.webp','.bmp','.pdf','.docx','.txt']);
+    if(!files.length){ toast('文件夹中没有可导入的文件（或尚未打开文件夹）'); return; }
+    if(files.length===1){ readFromDir(files[0],'resume'); return; }
+    const opt=await askList(files,'选择要导入的简历文件');
+    if(opt) readFromDir(opt,'resume');
+  });
+
+  // 引擎模式切换
+  $$('.mode').forEach(m=>m.addEventListener('click',()=>{
+    $$('.mode').forEach(x=>x.classList.toggle('on',x===m));
+    engine=m.dataset.mode;
+    $('#localCfg').classList.toggle('hidden',engine!=='local');
+    $('#cloudCfg').classList.toggle('hidden',engine!=='cloud');
+  }));
+
+  $('#runBtn').addEventListener('click',run);
+
+  $('#copyBtn').addEventListener('click',async()=>{
+    try{ await navigator.clipboard.writeText(finalMd); }catch(e){
+      const ta=document.createElement('textarea'); ta.value=finalMd; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    toast('已复制到剪贴板');
+  });
+  $('#dlBtn').addEventListener('click',()=>{
+    const a=document.createElement('a'); a.href='data:text/markdown;charset=utf-8,'+encodeURIComponent(finalMd); a.download='customized-resume.md'; a.click();
+  });
+
+  document.addEventListener('click',e=>{
+    const rm=e.target.closest('.rm'); if(!rm) return;
+    if(rm.dataset.clear==='resume'){ resumeFileText=''; $('#resumeChip').innerHTML=''; }
+    if(rm.dataset.clear==='jd'){ jdOcrText=''; $('#jdChip').innerHTML=''; $('#jdText').value=''; }
+  });
+
+  // Tabs
+  $$('.tab').forEach(t=>t.addEventListener('click',()=>{
+    $$('.tab').forEach(x=>x.classList.toggle('on',x===t));
+    $$('.panel').forEach(p=>p.classList.toggle('on',p.id==='tab-'+t.dataset.t));
+  }));
+
+  // PWA Service Worker 注册（仅 HTTPS / localhost 生效）
+  if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+});
+</script>
+</body>
+</html>
